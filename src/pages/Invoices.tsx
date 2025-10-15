@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, Printer, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
 
 interface Invoice {
   id: string;
@@ -72,11 +73,38 @@ export default function Invoices() {
 
   const handleSave = async () => {
     try {
+      // Validate inputs before saving
+      const invoiceSchema = z.object({
+        customer_name: z.string().trim().min(1, "Customer name is required").max(100, "Name too long"),
+        customer_email: z.string().trim().max(255, "Email too long").email("Invalid email").optional().or(z.literal('')).transform(val => val || null),
+        customer_phone: z.string().trim().max(20, "Phone too long").regex(/^[0-9+\-\s()]*$/, "Invalid phone format").optional().or(z.literal('')).transform(val => val || null),
+        customer_address: z.string().trim().max(500, "Address too long").optional().or(z.literal('')).transform(val => val || null),
+        notes: z.string().trim().max(1000, "Notes too long").optional().or(z.literal('')).transform(val => val || null),
+        items: z.array(z.object({
+          description: z.string().trim().min(1, "Item description required").max(200, "Description too long"),
+          quantity: z.number().int().positive("Quantity must be positive"),
+          unit_price: z.number().nonnegative("Price cannot be negative")
+        })).min(1, "At least one item required")
+      });
+
+      const validatedData = invoiceSchema.parse({
+        customer_name: form.customer_name,
+        customer_email: form.customer_email,
+        customer_phone: form.customer_phone,
+        customer_address: form.customer_address,
+        notes: form.notes,
+        items: form.items.map(item => ({
+          description: item.description,
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unit_price)
+        }))
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const invoiceNumber = `INV-${Date.now()}`;
-      const subtotal = form.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+      const subtotal = validatedData.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       const tax = 0; // Can be configured
       const total = subtotal + tax;
 
@@ -84,12 +112,12 @@ export default function Invoices() {
         .from("invoices")
         .insert({
           invoice_number: invoiceNumber,
-          customer_name: form.customer_name,
-          customer_email: form.customer_email || null,
-          customer_phone: form.customer_phone || null,
-          customer_address: form.customer_address || null,
+          customer_name: validatedData.customer_name,
+          customer_email: validatedData.customer_email,
+          customer_phone: validatedData.customer_phone,
+          customer_address: validatedData.customer_address,
           due_date: form.due_date || null,
-          notes: form.notes || null,
+          notes: validatedData.notes,
           subtotal,
           tax,
           total,
@@ -101,12 +129,12 @@ export default function Invoices() {
 
       if (invoiceError) throw invoiceError;
 
-      const items = form.items.map((item) => ({
+      const items = validatedData.items.map((item) => ({
         invoice_id: invoice.id,
         description: item.description,
-        quantity: Number(item.quantity),
-        unit_price: Number(item.unit_price),
-        subtotal: Number(item.subtotal),
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.quantity * item.unit_price,
       }));
 
       const { error: itemsError } = await supabase.from("invoice_items").insert(items);
@@ -125,7 +153,11 @@ export default function Invoices() {
       });
       fetchInvoices();
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
     }
   };
 

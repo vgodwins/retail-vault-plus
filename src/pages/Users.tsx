@@ -89,6 +89,9 @@ export default function Users() {
     }
   };
 
+  // UI-only check for display purposes. Actual authorization is enforced server-side by RLS policies.
+  // This controls what UI elements are visible to users, but all database operations are protected
+  // by Row Level Security at the database layer, so manipulating this variable cannot bypass security.
   const isAdmin = currentUserRole === "admin";
 
   return (

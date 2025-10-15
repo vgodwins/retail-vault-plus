@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Scan, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
 
 interface CartItem {
   id: string;
@@ -155,11 +156,42 @@ export default function POS() {
 
     setIsProcessing(true);
     try {
+      // Validate inputs before processing
+      const transactionSchema = z.object({
+        customer_name: z.string().max(100).optional().nullable().transform(val => val || null),
+        customer_phone: z.string().max(20).regex(/^[0-9+\-\s()]*$/, "Invalid phone format").optional().nullable().transform(val => val || null),
+        cart: z.array(z.object({
+          id: z.string().uuid(),
+          price: z.number().positive("Price must be positive"),
+          quantity: z.number().int().positive("Quantity must be positive")
+        })).min(1, "Cart cannot be empty"),
+        payments: z.array(z.object({
+          method: z.enum(['cash', 'card', 'mobile_money', 'voucher', 'bank_transfer']),
+          amount: z.number().positive("Payment amount must be positive")
+        })).min(1, "At least one payment method required")
+      });
+
+      const validatedData = transactionSchema.parse({
+        customer_name: customerName.trim() || null,
+        customer_phone: customerPhone.trim() || null,
+        cart: cart.map(item => ({
+          id: item.id,
+          price: item.price,
+          quantity: item.quantity
+        })),
+        payments: paymentMethods
+          .filter((pm) => pm.amount && Number(pm.amount) > 0)
+          .map((pm) => ({
+            method: pm.method,
+            amount: Number(pm.amount)
+          }))
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const transactionNumber = `TXN-${Date.now()}`;
-      const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const subtotal = validatedData.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const tax = subtotal * taxRate;
       const total = subtotal + tax - discount;
 
@@ -168,8 +200,8 @@ export default function POS() {
         .from("transactions")
         .insert({
           transaction_number: transactionNumber,
-          customer_name: customerName || null,
-          customer_phone: customerPhone || null,
+          customer_name: validatedData.customer_name,
+          customer_phone: validatedData.customer_phone,
           created_by: user.id,
           subtotal,
           tax,
@@ -195,13 +227,11 @@ export default function POS() {
       if (itemsError) throw itemsError;
 
       // Create payments
-      const payments = paymentMethods
-        .filter((pm) => pm.amount && Number(pm.amount) > 0)
-        .map((pm) => ({
-          transaction_id: transaction.id,
-          payment_method: pm.method as any,
-          amount: Number(pm.amount),
-        }));
+      const payments = validatedData.payments.map((pm) => ({
+        transaction_id: transaction.id,
+        payment_method: pm.method as any,
+        amount: pm.amount,
+      }));
 
       const { error: paymentsError } = await supabase.from("transaction_payments").insert(payments);
       if (paymentsError) throw paymentsError;
@@ -234,7 +264,11 @@ export default function POS() {
       setPaymentMethods([{ method: "cash", amount: "" }]);
       setShowPayment(false);
     } catch (error: any) {
-      toast.error(error.message || "Failed to process payment");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Failed to process payment");
+      }
     } finally {
       setIsProcessing(false);
     }

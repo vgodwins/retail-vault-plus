@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Package, AlertTriangle, RotateCcw, XCircle, Plus, Edit, Trash2, Scan } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
 
 interface InventoryItem {
   id: string;
@@ -76,18 +77,41 @@ export default function Inventory() {
 
   const handleSaveProduct = async () => {
     try {
+      // Validate inputs before saving
+      const productSchema = z.object({
+        name: z.string().trim().min(1, "Product name is required").max(100, "Name too long"),
+        sku: z.string().trim().max(50, "SKU too long").optional().or(z.literal('')).transform(val => val || null),
+        barcode: z.string().trim().max(50, "Barcode too long").optional().or(z.literal('')).transform(val => val || null),
+        category: z.string().trim().max(50, "Category too long").optional().or(z.literal('')).transform(val => val || null),
+        description: z.string().trim().max(500, "Description too long").optional().or(z.literal('')).transform(val => val || null),
+        unit_price: z.number().nonnegative("Unit price cannot be negative"),
+        cost_price: z.number().nonnegative("Cost price cannot be negative").optional().nullable(),
+        reorder_level: z.number().int().nonnegative("Reorder level cannot be negative")
+      });
+
+      const validatedData = productSchema.parse({
+        name: productForm.name,
+        sku: productForm.sku,
+        barcode: productForm.barcode,
+        category: productForm.category,
+        description: productForm.description,
+        unit_price: Number(productForm.unit_price),
+        cost_price: productForm.cost_price ? Number(productForm.cost_price) : null,
+        reorder_level: Number(productForm.reorder_level)
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const productData = {
-        name: productForm.name,
-        sku: productForm.sku || null,
-        barcode: productForm.barcode || null,
-        category: productForm.category || null,
-        unit_price: Number(productForm.unit_price),
-        cost_price: productForm.cost_price ? Number(productForm.cost_price) : null,
-        reorder_level: Number(productForm.reorder_level),
-        description: productForm.description || null,
+        name: validatedData.name,
+        sku: validatedData.sku,
+        barcode: validatedData.barcode,
+        category: validatedData.category,
+        unit_price: validatedData.unit_price,
+        cost_price: validatedData.cost_price,
+        reorder_level: validatedData.reorder_level,
+        description: validatedData.description,
         created_by: user.id,
       };
 
@@ -117,22 +141,43 @@ export default function Inventory() {
         description: "",
       });
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
     }
   };
 
   const handleSaveInventory = async () => {
     try {
+      // Validate inputs before saving
+      const inventorySchema = z.object({
+        product_id: z.string().uuid("Invalid product selection"),
+        quantity: z.number().int().nonnegative("Quantity cannot be negative"),
+        status: z.enum(['valid', 'returned', 'damaged', 'expired']),
+        batch_number: z.string().trim().max(50, "Batch number too long").optional().or(z.literal('')).transform(val => val || null),
+        notes: z.string().trim().max(500, "Notes too long").optional().or(z.literal('')).transform(val => val || null)
+      });
+
+      const validatedData = inventorySchema.parse({
+        product_id: inventoryForm.product_id,
+        quantity: Number(inventoryForm.quantity),
+        status: inventoryForm.status,
+        batch_number: inventoryForm.batch_number,
+        notes: inventoryForm.notes
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const { error } = await supabase.from("inventory").insert({
-        product_id: inventoryForm.product_id,
-        quantity: Number(inventoryForm.quantity),
-        status: inventoryForm.status as any,
-        batch_number: inventoryForm.batch_number || null,
+        product_id: validatedData.product_id,
+        quantity: validatedData.quantity,
+        status: validatedData.status as any,
+        batch_number: validatedData.batch_number,
         expiry_date: inventoryForm.expiry_date || null,
-        notes: inventoryForm.notes || null,
+        notes: validatedData.notes,
         updated_by: user.id,
       });
 
@@ -150,7 +195,11 @@ export default function Inventory() {
       });
       fetchInventory();
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
     }
   };
 
