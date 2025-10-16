@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Package, AlertTriangle, RotateCcw, XCircle, Plus, Edit, Trash2, Scan } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +112,16 @@ export default function Inventory() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Authorization: only admins and managers can create/update products
+      const [{ data: isAdmin }, { data: isManager }] = await Promise.all([
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'admin' }),
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'manager' }),
+      ]);
+      if (!isAdmin && !isManager) {
+        toast.error("You don't have permission to manage products.");
+        return;
+      }
+
       const productData = {
         name: validatedData.name,
         sku: validatedData.sku,
@@ -171,6 +190,16 @@ export default function Inventory() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Authorization: only admins and managers can add inventory
+      const [{ data: isAdmin }, { data: isManager }] = await Promise.all([
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'admin' }),
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'manager' }),
+      ]);
+      if (!isAdmin && !isManager) {
+        toast.error("You don't have permission to manage inventory.");
+        return;
+      }
+
       const { error } = await supabase.from("inventory").insert({
         product_id: validatedData.product_id,
         quantity: validatedData.quantity,
@@ -205,6 +234,22 @@ export default function Inventory() {
 
   const handleDeleteInventory = async (id: string) => {
     if (!confirm("Are you sure you want to delete this inventory record?")) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
+      return;
+    }
+
+    // Authorization: only admins and managers can delete inventory
+    const [{ data: isAdmin }, { data: isManager }] = await Promise.all([
+      supabase.rpc('has_role', { user_id: user.id, check_role: 'admin' }),
+      supabase.rpc('has_role', { user_id: user.id, check_role: 'manager' }),
+    ]);
+    if (!isAdmin && !isManager) {
+      toast.error("You don't have permission to delete inventory.");
+      return;
+    }
 
     const { error } = await supabase.from("inventory").delete().eq("id", id);
     

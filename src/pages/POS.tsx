@@ -190,6 +190,18 @@ export default function POS() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Authorization: cashiers, managers and admins can process payments
+      const [adminRes, managerRes, cashierRes] = await Promise.all([
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'admin' }),
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'manager' }),
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'cashier' }),
+      ]);
+      const isAuthorized = !!(adminRes.data || managerRes.data || cashierRes.data);
+      if (!isAuthorized) {
+        toast.error("You don't have permission to process transactions.");
+        return;
+      }
+
       const transactionNumber = `TXN-${Date.now()}`;
       const subtotal = validatedData.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const tax = subtotal * taxRate;
