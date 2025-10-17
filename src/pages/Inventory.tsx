@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Package, AlertTriangle, RotateCcw, XCircle, Plus, Edit, Trash2, Scan } from "lucide-react";
@@ -72,6 +72,12 @@ export default function Inventory() {
     fetchInventory();
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (showInventoryDialog) {
+      fetchProducts();
+    }
+  }, [showInventoryDialog]);
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -294,7 +300,13 @@ export default function Inventory() {
         {items.length === 0 ? (
           <TableRow>
             <TableCell colSpan={7} className="text-center text-muted-foreground">
-              No items found
+              <div className="flex items-center justify-center gap-3">
+                <span>No items found</span>
+                <Button size="sm" onClick={() => setShowInventoryDialog(true)}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Add Stock
+                </Button>
+              </div>
             </TableCell>
           </TableRow>
         ) : (
@@ -406,6 +418,7 @@ export default function Inventory() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
+            <DialogDescription>Enter product details then save.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -488,6 +501,7 @@ export default function Inventory() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Inventory Stock</DialogTitle>
+            <DialogDescription>Select a product and quantity to add stock.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
