@@ -60,7 +60,7 @@ export default function Settings() {
       for (const update of updates) {
         const { error } = await supabase
           .from("app_settings")
-          .upsert({ key: update.key, value: update.value });
+          .upsert({ key: update.key, value: update.value }, { onConflict: 'key' });
 
         if (error) throw error;
       }

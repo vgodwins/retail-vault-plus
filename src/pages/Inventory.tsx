@@ -14,6 +14,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 
+interface Product {
+  id: string;
+  name: string;
+  sku: string | null;
+  barcode: string | null;
+}
+
 interface InventoryItem {
   id: string;
   product_id: string;
@@ -38,6 +45,7 @@ interface ProductForm {
 
 export default function Inventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showInventoryDialog, setShowInventoryDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
@@ -62,7 +70,20 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory();
+    fetchProducts();
   }, []);
+
+  const fetchProducts = async () => {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, name, sku, barcode")
+      .eq("is_active", true)
+      .order("name");
+
+    if (!error && data) {
+      setProducts(data);
+    }
+  };
 
   const fetchInventory = async () => {
     const { data, error } = await supabase
@@ -471,13 +492,27 @@ export default function Inventory() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Product *</Label>
-              <Input
-                placeholder="Search product by name or barcode..."
-                onFocus={async () => {
-                  const { data } = await supabase.from("products").select("id, name").eq("is_active", true);
-                  console.log("Products:", data);
-                }}
-              />
+              <Select
+                value={inventoryForm.product_id}
+                onValueChange={(value) => setInventoryForm({ ...inventoryForm, product_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a product" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      No products available. Create a product first.
+                    </div>
+                  ) : (
+                    products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name} {product.sku && `(${product.sku})`}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Quantity *</Label>

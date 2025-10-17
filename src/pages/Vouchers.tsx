@@ -61,6 +61,21 @@ export default function Vouchers() {
 
   const handleSave = async () => {
     try {
+      if (!form.code.trim()) {
+        toast.error("Voucher code is required");
+        return;
+      }
+
+      if (!form.value || Number(form.value) <= 0) {
+        toast.error("Discount value must be greater than 0");
+        return;
+      }
+
+      if (form.is_percentage && Number(form.value) > 100) {
+        toast.error("Percentage discount cannot exceed 100%");
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
