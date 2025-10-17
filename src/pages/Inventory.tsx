@@ -130,6 +130,35 @@ export default function Inventory() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Check for duplicate SKU or barcode
+      if (validatedData.sku) {
+        const { data: existingSku } = await supabase
+          .from("products")
+          .select("id")
+          .eq("sku", validatedData.sku)
+          .neq("id", editingProduct || "")
+          .maybeSingle();
+        
+        if (existingSku) {
+          toast.error("This SKU is already in use by another product");
+          return;
+        }
+      }
+
+      if (validatedData.barcode) {
+        const { data: existingBarcode } = await supabase
+          .from("products")
+          .select("id")
+          .eq("barcode", validatedData.barcode)
+          .neq("id", editingProduct || "")
+          .maybeSingle();
+        
+        if (existingBarcode) {
+          toast.error("This barcode is already in use by another product");
+          return;
+        }
+      }
+
       // Authorization: only admins and managers can create/update products
       const [{ data: isAdmin }, { data: isManager }] = await Promise.all([
         supabase.rpc('has_role', { user_id: user.id, check_role: 'admin' }),
