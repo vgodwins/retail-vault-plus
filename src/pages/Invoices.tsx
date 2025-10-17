@@ -103,6 +103,16 @@ export default function Invoices() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Authorization: only admins and managers can create invoices
+      const [{ data: isAdmin }, { data: isManager }] = await Promise.all([
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'admin' }),
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'manager' }),
+      ]);
+      if (!isAdmin && !isManager) {
+        toast.error("You don't have permission to create invoices.");
+        return;
+      }
+
       const invoiceNumber = `INV-${Date.now()}`;
       const subtotal = validatedData.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       const tax = 0; // Can be configured

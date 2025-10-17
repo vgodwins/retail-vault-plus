@@ -58,6 +58,16 @@ export default function Expenditures() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Authorization: only admins and managers can add expenditures
+      const [{ data: isAdmin }, { data: isManager }] = await Promise.all([
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'admin' }),
+        supabase.rpc('has_role', { user_id: user.id, check_role: 'manager' }),
+      ]);
+      if (!isAdmin && !isManager) {
+        toast.error("You don't have permission to add expenditures.");
+        return;
+      }
+
       const { error } = await supabase.from("expenditures").insert({
         description: form.description,
         category: form.category,
