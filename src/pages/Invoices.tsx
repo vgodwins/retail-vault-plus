@@ -35,10 +35,28 @@ export default function Invoices() {
     notes: "",
     items: [{ description: "", quantity: "1", unit_price: "", subtotal: "0" }],
   });
+  const [currencySymbol, setCurrencySymbol] = useState("$");
 
   useEffect(() => {
     fetchInvoices();
+    fetchCurrency();
   }, []);
+
+  const fetchCurrency = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "currency")
+      .maybeSingle();
+    
+    if (data?.value) {
+      const currencySymbols: Record<string, string> = {
+        USD: "$", EUR: "€", GBP: "£", NGN: "₦", JPY: "¥",
+        CNY: "¥", INR: "₹", KES: "KSh", ZAR: "R",
+      };
+      setCurrencySymbol(currencySymbols[data.value as string] || data.value as string);
+    }
+  };
 
   const fetchInvoices = async () => {
     const { data, error } = await supabase
@@ -231,7 +249,7 @@ export default function Invoices() {
                       <TableCell>
                         {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "-"}
                       </TableCell>
-                      <TableCell className="font-bold">${Number(invoice.total).toFixed(2)}</TableCell>
+                      <TableCell className="font-bold">{currencySymbol}{Number(invoice.total).toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant={getStatusColor(invoice.status)} className="capitalize">
                           {invoice.status}
@@ -367,7 +385,7 @@ export default function Invoices() {
               <div className="flex justify-between text-lg font-bold">
                 <span>Total:</span>
                 <span>
-                  ${form.items.reduce((sum, item) => sum + Number(item.subtotal), 0).toFixed(2)}
+                  {currencySymbol}{form.items.reduce((sum, item) => sum + Number(item.subtotal), 0).toFixed(2)}
                 </span>
               </div>
             </div>

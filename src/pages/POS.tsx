@@ -42,11 +42,29 @@ export default function POS() {
     { method: "cash", amount: "" },
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currencySymbol, setCurrencySymbol] = useState("$");
 
   useEffect(() => {
     fetchProducts();
     fetchTaxRate();
+    fetchCurrency();
   }, []);
+
+  const fetchCurrency = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "currency")
+      .maybeSingle();
+    
+    if (data?.value) {
+      const currencySymbols: Record<string, string> = {
+        USD: "$", EUR: "€", GBP: "£", NGN: "₦", JPY: "¥",
+        CNY: "¥", INR: "₹", KES: "KSh", ZAR: "R",
+      };
+      setCurrencySymbol(currencySymbols[data.value as string] || data.value as string);
+    }
+  };
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -139,7 +157,7 @@ export default function POS() {
 
     const currentSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     if (currentSubtotal < Number(data.min_purchase)) {
-      toast.error(`Minimum purchase of $${data.min_purchase} required`);
+      toast.error(`Minimum purchase of ${currencySymbol}${data.min_purchase} required`);
       return;
     }
 
@@ -148,7 +166,7 @@ export default function POS() {
       : Number(data.value);
 
     setDiscount(discountAmount);
-    toast.success(`Voucher applied: $${discountAmount.toFixed(2)} discount`);
+    toast.success(`Voucher applied: ${currencySymbol}${discountAmount.toFixed(2)} discount`);
   };
 
   const processPayment = async () => {
@@ -314,15 +332,15 @@ export default function POS() {
           ${cart.map(item => `
             <div class="row">
               <span>${item.name} x${item.quantity}</span>
-              <span>$${(item.price * item.quantity).toFixed(2)}</span>
+              <span>${currencySymbol}${(item.price * item.quantity).toFixed(2)}</span>
             </div>
           `).join('')}
           <div class="line"></div>
-          <div class="row"><span>Subtotal:</span><span>$${transaction.subtotal.toFixed(2)}</span></div>
-          <div class="row"><span>Tax:</span><span>$${transaction.tax.toFixed(2)}</span></div>
-          ${transaction.discount > 0 ? `<div class="row"><span>Discount:</span><span>-$${transaction.discount.toFixed(2)}</span></div>` : ''}
+          <div class="row"><span>Subtotal:</span><span>${currencySymbol}${transaction.subtotal.toFixed(2)}</span></div>
+          <div class="row"><span>Tax:</span><span>${currencySymbol}${transaction.tax.toFixed(2)}</span></div>
+          ${transaction.discount > 0 ? `<div class="row"><span>Discount:</span><span>-${currencySymbol}${transaction.discount.toFixed(2)}</span></div>` : ''}
           <div class="line"></div>
-          <div class="row total"><span>TOTAL:</span><span>$${transaction.total.toFixed(2)}</span></div>
+          <div class="row total"><span>TOTAL:</span><span>${currencySymbol}${transaction.total.toFixed(2)}</span></div>
           <div class="line"></div>
           <p style="text-align: center;">Thank you for your purchase!</p>
           <button onclick="window.print()" style="width: 100%; padding: 10px; margin-top: 20px;">Print Receipt</button>
@@ -334,9 +352,9 @@ export default function POS() {
     receiptWindow.document.close();
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * taxRate;
-  const total = subtotal + tax - discount;
+  const subtotal = cart.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0) || 0;
+  const tax = subtotal * (Number(taxRate) || 0);
+  const total = subtotal + tax - (Number(discount) || 0);
 
   return (
     <DashboardLayout>
@@ -382,7 +400,7 @@ export default function POS() {
                       })}
                     >
                       <span className="font-medium text-sm">{product.name}</span>
-                      <span className="text-xs text-muted-foreground">${Number(product.unit_price).toFixed(2)}</span>
+                      <span className="text-xs text-muted-foreground">{currencySymbol}{Number(product.unit_price).toFixed(2)}</span>
                     </Button>
                   ))}
                 </div>
@@ -405,7 +423,7 @@ export default function POS() {
                         <div className="flex-1">
                           <div className="font-medium">{item.name}</div>
                           <div className="text-sm text-muted-foreground">
-                            ${item.price.toFixed(2)} each
+                            {currencySymbol}{item.price.toFixed(2)} each
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -426,7 +444,7 @@ export default function POS() {
                           </Button>
                         </div>
                         <div className="font-bold w-24 text-right">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          {currencySymbol}{(item.price * item.quantity).toFixed(2)}
                         </div>
                         <Button
                           variant="ghost"
@@ -452,16 +470,16 @@ export default function POS() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>${subtotal.toFixed(2)}</span>
+                    <span>{currencySymbol}{subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax</span>
-                    <span>${tax.toFixed(2)}</span>
+                    <span>{currencySymbol}{tax.toFixed(2)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span className="text-primary">${total.toFixed(2)}</span>
+                    <span className="text-primary">{currencySymbol}{total.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -485,7 +503,7 @@ export default function POS() {
                   {discount > 0 && (
                     <div className="flex justify-between text-sm text-success">
                       <span>Discount Applied</span>
-                      <span>-${discount.toFixed(2)}</span>
+                      <span>-{currencySymbol}{discount.toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -587,12 +605,12 @@ export default function POS() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span>Total Amount:</span>
-                <span className="font-bold text-lg">${total.toFixed(2)}</span>
+                <span className="font-bold text-lg">{currencySymbol}{total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Total Paid:</span>
                 <span>
-                  $
+                  {currencySymbol}
                   {paymentMethods
                     .reduce((sum, pm) => sum + (Number(pm.amount) || 0), 0)
                     .toFixed(2)}

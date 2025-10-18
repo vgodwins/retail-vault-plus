@@ -35,10 +35,28 @@ export default function Expenditures() {
     notes: "",
   });
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [currencySymbol, setCurrencySymbol] = useState("$");
 
   useEffect(() => {
     fetchExpenditures();
+    fetchCurrency();
   }, []);
+
+  const fetchCurrency = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "currency")
+      .maybeSingle();
+    
+    if (data?.value) {
+      const currencySymbols: Record<string, string> = {
+        USD: "$", EUR: "€", GBP: "£", NGN: "₦", JPY: "¥",
+        CNY: "¥", INR: "₹", KES: "KSh", ZAR: "R",
+      };
+      setCurrencySymbol(currencySymbols[data.value as string] || data.value as string);
+    }
+  };
 
   const fetchExpenditures = async () => {
     const { data, error } = await supabase
@@ -129,7 +147,7 @@ export default function Expenditures() {
             <DollarSign className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">${totalExpenses.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-destructive">{currencySymbol}{totalExpenses.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">All time expenditures</p>
           </CardContent>
         </Card>
@@ -166,7 +184,7 @@ export default function Expenditures() {
                       <TableCell>{exp.category}</TableCell>
                       <TableCell className="capitalize">{exp.payment_method.replace("_", " ")}</TableCell>
                       <TableCell className="font-bold text-destructive">
-                        ${Number(exp.amount).toFixed(2)}
+                        {currencySymbol}{Number(exp.amount).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-sm">{exp.notes || "-"}</TableCell>
                       <TableCell>

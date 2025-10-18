@@ -38,10 +38,28 @@ export default function Vouchers() {
     max_uses: "",
     expires_at: "",
   });
+  const [currencySymbol, setCurrencySymbol] = useState("$");
 
   useEffect(() => {
     fetchVouchers();
+    fetchCurrency();
   }, []);
+
+  const fetchCurrency = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "currency")
+      .maybeSingle();
+    
+    if (data?.value) {
+      const currencySymbols: Record<string, string> = {
+        USD: "$", EUR: "€", GBP: "£", NGN: "₦", JPY: "¥",
+        CNY: "¥", INR: "₹", KES: "KSh", ZAR: "R",
+      };
+      setCurrencySymbol(currencySymbols[data.value as string] || data.value as string);
+    }
+  };
 
   const fetchVouchers = async () => {
     const { data, error } = await supabase
@@ -209,9 +227,9 @@ export default function Vouchers() {
                       <TableCell className="font-medium">
                         {voucher.is_percentage
                           ? `${voucher.value}%`
-                          : `$${Number(voucher.value).toFixed(2)}`}
+                          : `${currencySymbol}${Number(voucher.value).toFixed(2)}`}
                       </TableCell>
-                      <TableCell>${Number(voucher.min_purchase).toFixed(2)}</TableCell>
+                      <TableCell>{currencySymbol}{Number(voucher.min_purchase).toFixed(2)}</TableCell>
                       <TableCell>
                         {voucher.uses_count}
                         {voucher.max_uses ? ` / ${voucher.max_uses}` : " / ∞"}

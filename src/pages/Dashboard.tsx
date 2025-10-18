@@ -11,10 +11,28 @@ export default function Dashboard() {
     todaySales: 0,
     lowStock: 0,
   });
+  const [currencySymbol, setCurrencySymbol] = useState("$");
 
   useEffect(() => {
     fetchStats();
+    fetchCurrency();
   }, []);
+
+  const fetchCurrency = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "currency")
+      .maybeSingle();
+    
+    if (data?.value) {
+      const currencySymbols: Record<string, string> = {
+        USD: "$", EUR: "€", GBP: "£", NGN: "₦", JPY: "¥",
+        CNY: "¥", INR: "₹", KES: "KSh", ZAR: "R",
+      };
+      setCurrencySymbol(currencySymbols[data.value as string] || data.value as string);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -79,7 +97,7 @@ export default function Dashboard() {
               <DollarSign className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.totalSales.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{currencySymbol}{stats.totalSales.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">All time revenue</p>
             </CardContent>
           </Card>
@@ -90,7 +108,7 @@ export default function Dashboard() {
               <TrendingUp className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.todaySales.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{currencySymbol}{stats.todaySales.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">Revenue today</p>
             </CardContent>
           </Card>

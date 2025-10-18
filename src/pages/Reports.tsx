@@ -11,10 +11,28 @@ export default function Reports() {
     topProducts: [] as Array<{ name: string; quantity: number; revenue: number }>,
     paymentMethods: [] as Array<{ method: string; count: number; total: number }>,
   });
+  const [currencySymbol, setCurrencySymbol] = useState("$");
 
   useEffect(() => {
     fetchReportsData();
+    fetchCurrency();
   }, []);
+
+  const fetchCurrency = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "currency")
+      .maybeSingle();
+    
+    if (data?.value) {
+      const currencySymbols: Record<string, string> = {
+        USD: "$", EUR: "€", GBP: "£", NGN: "₦", JPY: "¥",
+        CNY: "¥", INR: "₹", KES: "KSh", ZAR: "R",
+      };
+      setCurrencySymbol(currencySymbols[data.value as string] || data.value as string);
+    }
+  };
 
   const fetchReportsData = async () => {
     // Fetch last 7 days sales
@@ -114,7 +132,7 @@ export default function Reports() {
                     {salesData.dailySales.map((day, idx) => (
                       <div key={idx} className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">{day.date}</span>
-                        <span className="font-bold">${day.total.toFixed(2)}</span>
+                        <span className="font-bold">{currencySymbol}{day.total.toFixed(2)}</span>
                       </div>
                     ))}
                     {salesData.dailySales.length === 0 && (
@@ -139,7 +157,7 @@ export default function Reports() {
                           <p className="text-sm font-medium">{product.name}</p>
                           <p className="text-xs text-muted-foreground">{product.quantity} sold</p>
                         </div>
-                        <span className="font-bold">${product.revenue.toFixed(2)}</span>
+                        <span className="font-bold">{currencySymbol}{product.revenue.toFixed(2)}</span>
                       </div>
                     ))}
                     {salesData.topProducts.length === 0 && (
@@ -165,7 +183,7 @@ export default function Reports() {
                         <p className="font-medium capitalize">{pm.method.replace("_", " ")}</p>
                         <p className="text-sm text-muted-foreground">{pm.count} transactions</p>
                       </div>
-                      <span className="text-lg font-bold">${pm.total.toFixed(2)}</span>
+                      <span className="text-lg font-bold">{currencySymbol}{pm.total.toFixed(2)}</span>
                     </div>
                   ))}
                   {salesData.paymentMethods.length === 0 && (

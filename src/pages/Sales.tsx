@@ -37,11 +37,29 @@ export default function Sales() {
     monthSales: 0,
     totalTransactions: 0,
   });
+  const [currencySymbol, setCurrencySymbol] = useState("$");
 
   useEffect(() => {
     fetchTransactions();
     fetchStats();
+    fetchCurrency();
   }, []);
+
+  const fetchCurrency = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "currency")
+      .maybeSingle();
+    
+    if (data?.value) {
+      const currencySymbols: Record<string, string> = {
+        USD: "$", EUR: "€", GBP: "£", NGN: "₦", JPY: "¥",
+        CNY: "¥", INR: "₹", KES: "KSh", ZAR: "R",
+      };
+      setCurrencySymbol(currencySymbols[data.value as string] || data.value as string);
+    }
+  };
 
   const fetchTransactions = async () => {
     const { data, error } = await supabase
@@ -115,7 +133,7 @@ export default function Sales() {
               <DollarSign className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.todaySales.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{currencySymbol}{stats.todaySales.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -124,7 +142,7 @@ export default function Sales() {
               <TrendingUp className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.weekSales.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{currencySymbol}{stats.weekSales.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -133,7 +151,7 @@ export default function Sales() {
               <TrendingUp className="h-4 w-4 text-info" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.monthSales.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{currencySymbol}{stats.monthSales.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -182,7 +200,7 @@ export default function Sales() {
                     <TableCell>{new Date(transaction.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>{transaction.customer_name || "Walk-in"}</TableCell>
                     <TableCell>{transaction.transaction_items.length}</TableCell>
-                    <TableCell className="font-bold">${Number(transaction.total).toFixed(2)}</TableCell>
+                    <TableCell className="font-bold">{currencySymbol}{Number(transaction.total).toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
@@ -257,9 +275,9 @@ export default function Sales() {
                       <TableRow key={idx}>
                         <TableCell>{item.products.name}</TableCell>
                         <TableCell>{item.quantity}</TableCell>
-                        <TableCell>${Number(item.unit_price).toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{Number(item.unit_price).toFixed(2)}</TableCell>
                         <TableCell>
-                          ${(Number(item.unit_price) * item.quantity).toFixed(2)}
+                          {currencySymbol}{(Number(item.unit_price) * item.quantity).toFixed(2)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -273,7 +291,7 @@ export default function Sales() {
                   {selectedTransaction.transaction_payments.map((payment, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
                       <span className="capitalize">{payment.payment_method.replace("_", " ")}</span>
-                      <span className="font-medium">${Number(payment.amount).toFixed(2)}</span>
+                      <span className="font-medium">{currencySymbol}{Number(payment.amount).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -282,7 +300,7 @@ export default function Sales() {
               <div className="pt-4 border-t">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>${Number(selectedTransaction.total).toFixed(2)}</span>
+                  <span>{currencySymbol}{Number(selectedTransaction.total).toFixed(2)}</span>
                 </div>
               </div>
             </div>
