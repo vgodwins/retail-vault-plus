@@ -34,11 +34,12 @@ export default function Users() {
     const { data } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
-      .single();
+      .eq("user_id", user.id);
 
-    if (data) {
-      setCurrentUserRole(data.role);
+    if (data && data.length > 0) {
+      // Check if user has admin role among their roles
+      const hasAdmin = data.some(r => r.role === 'admin');
+      setCurrentUserRole(hasAdmin ? 'admin' : data[0].role);
     }
   };
 
